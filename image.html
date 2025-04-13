@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Webcam Filter App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        .video-container {
+            position: relative;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        
+        video, canvas {
+            width: 100%;
+            max-width: 640px;
+            height: auto;
+            border-radius: 5px;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        video {
+            display: none; /* Hide the video element as we'll display the canvas instead */
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button.active {
+            background-color: #2E7D32;
+        }
+        
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 640px;
+            margin-bottom: 15px;
+        }
+        
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+        }
+        
+        .info {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 640px;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Real-time Webcam Filter App</h1>
+        
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">Start Webcam</button>
+            <button id="normalBtn" class="filter-btn active">Normal</button>
+            <button id="grayscaleBtn" class="filter-btn">Grayscale</button>
+            <button id="sepiaBtn" class="filter-btn">Sepia</button>
+            <button id="invertBtn" class="filter-btn">Invert</button>
+            <button id="pixelateBtn" class="filter-btn">Pixelate</button>
+            <button id="edgeDetectBtn" class="filter-btn">Edge Detection</button>
+            <button id="brightnessBtn" class="filter-btn">Brightness</button>
+            <button id="snapshotBtn" disabled>Take Snapshot</button>
+        </div>
+        
+        <div class="slider-container" id="brightnessControls" style="display: none;">
+            <label for="brightnessSlider">Brightness: <span id="brightnessValue">0</span></label>
+            <input type="range" id="brightnessSlider" min="-100" max="100" value="0">
+        </div>
+        
+        <div class="slider-container" id="pixelateControls" style="display: none;">
+            <label for="pixelateSlider">Pixelation Level: <span id="pixelateValue">10</span></label>
+            <input type="range" id="pixelateSlider" min="1" max="50" value="10">
+        </div>
+        
+        <div class="info">
+            <p>Click "Start Webcam" to begin. Select a filter to apply it to the webcam feed in real-time. Take a snapshot to save the current view.</p>
+            <p>Note: This app requires webcam access. Please allow access when prompted by your browser.</p>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const startBtn = document.getElementById('startBtn');
+        const snapshotBtn = document.getElementById('snapshotBtn');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        const brightnessSlider = document.getElementById('brightnessSlider');
+        const brightnessValue = document.getElementById('brightnessValue');
+        const brightnessControls = document.getElementById('brightnessControls');
+        const pixelateSlider = document.getElementById('pixelateSlider');
+        const pixelateValue = document.getElementById('pixelateValue');
+        const pixelateControls = document.getElementById('pixelateControls');
+        
+        // Canvas context
+        const ctx = canvas.getContext('2d');
+        
+        // Current selected filter
+        let currentFilter = 'normal';
+        let brightnessLevel = 0;
+        let pixelateLevel = 10;
+        let streamStarted = false;
+        
+        // Setup event listeners
+        startBtn.addEventListener('click', startWebcam);
+        snapshotBtn.addEventListener('click', takeSnapshot);
+        brightnessSlider.addEventListener('input', updateBrightnessLevel);
+        pixelateSlider.addEventListener('input', updatePixelateLevel);
+        
+        // Add event listeners to filter buttons
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Remove active class from all buttons
+                filterBtns.forEach(b => b.classList.remove('active'));
+                
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                // Set current filter
+                currentFilter = this.id.replace('Btn', '');
+                
+                // Show/hide brightness controls
+                brightnessControls.style.display = currentFilter === 'brightness' ? 'flex' : 'none';
+                
+                // Show/hide pixelate controls
+                pixelateControls.style.display = currentFilter === 'pixelate' ? 'flex' : 'none';
+            });
+        });
+        
+        // Function to start webcam
+        function startWebcam() {
+            if (streamStarted) {
+                video.play();
+                return;
+            }
+            
+            // Browser compatibility for getUserMedia
+            navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false
+            })
+            .then(function(stream) {
+                video.srcObject = stream;
+                video.play();
+                
+                // Set canvas dimensions once video metadata is loaded
+                video.addEventListener('loadedmetadata', function() {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    streamStarted = true;
+                    startBtn.textContent = 'Pause';
+                    snapshotBtn.disabled = false;
+                    // Start processing video frames
+                    requestAnimationFrame(processVideo);
+                });
+            })
+            .catch(function(error) {
+                console.error('Error accessing webcam:', error);
+                alert('Error accessing webcam. Please make sure you have a webcam connected and have granted permission.');
+            });
+        }
+        
+        // Function to process video frames
+        function processVideo() {
+            if (video.paused || video.ended) {
+                return;
+            }
+            
+            // Draw video frame to canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Get pixel data
+            let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Apply selected filter
+            switch (currentFilter) {
+                case 'grayscale':
+                    applyGrayscale(imageData);
+                    break;
+                case 'sepia':
+                    applySepia(imageData);
+                    break;
+                case 'invert':
+                    applyInvert(imageData);
+                    break;
+                case 'brightness':
+                    applyBrightness(imageData, brightnessLevel);
+                    break;
+                case 'pixelate':
+                    // For pixelate, we'll use a different approach
+                    ctx.putImageData(imageData, 0, 0);
+                    applyPixelate(pixelateLevel);
+                    requestAnimationFrame(processVideo);
+                    return;
+                case 'edgeDetect':
+                    applyEdgeDetection(imageData);
+                    break;
+                // Normal case just uses the original imageData
+            }
+            
+            // Draw modified pixel data back to canvas
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Request next frame
+            requestAnimationFrame(processVideo);
+        }
+        
+        // Filter functions
+        function applyGrayscale(imageData) {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                data[i] = avg;     // Red
+                data[i + 1] = avg; // Green
+                data[i + 2] = avg; // Blue
+            }
+        }
+        
+        function applySepia(imageData) {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                
+                data[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189));     // Red
+                data[i + 1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168)); // Green
+                data[i + 2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131)); // Blue
+            }
+        }
+        
+        function applyInvert(imageData) {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = 255 - data[i];         // Red
+                data[i + 1] = 255 - data[i + 1]; // Green
+                data[i + 2] = 255 - data[i + 2]; // Blue
+            }
+        }
+        
+        function applyBrightness(imageData, level) {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = Math.min(255, Math.max(0, data[i] + level));         // Red
+                data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + level)); // Green
+                data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + level)); // Blue
+            }
+        }
+        
+        function applyPixelate(level) {
+            const size = Math.max(1, level);
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            // Create a temporary canvas to hold the original image
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = w;
+            tempCanvas.height = h;
+            tempCtx.drawImage(canvas, 0, 0);
+            
+            // Clear the main canvas
+            ctx.clearRect(0, 0, w, h);
+            
+            // Apply pixelation effect
+            for (let y = 0; y < h; y += size) {
+                for (let x = 0; x < w; x += size) {
+                    // Get the color at the center of the current block
+                    const pixelData = tempCtx.getImageData(x, y, 1, 1).data;
+                    
+                    // Draw a filled rectangle with that color
+                    ctx.fillStyle = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3]/255})`;
+                    ctx.fillRect(x, y, size, size);
+                }
+            }
+        }
+        
+        function applyEdgeDetection(imageData) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            
+            // Create a copy of the image data
+            const originalData = new Uint8ClampedArray(data);
+            
+            // Apply a simple edge detection algorithm
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const index = (y * width + x) * 4;
+                    
+                    // Get surrounding pixels
+                    const topIndex = ((y - 1) * width + x) * 4;
+                    const bottomIndex = ((y + 1) * width + x) * 4;
+                    const leftIndex = (y * width + (x - 1)) * 4;
+                    const rightIndex = (y * width + (x + 1)) * 4;
+                    
+                    // Calculate differences
+                    const hDiff = Math.abs(originalData[leftIndex] - originalData[rightIndex]);
+                    const vDiff = Math.abs(originalData[topIndex] - originalData[bottomIndex]);
+                    
+                    // Set edge value (simple threshold)
+                    const edgeValue = hDiff + vDiff > 50 ? 255 : 0;
+                    
+                    // Set RGB values to edge value (black/white)
+                    data[index] = edgeValue;     // Red
+                    data[index + 1] = edgeValue; // Green
+                    data[index + 2] = edgeValue; // Blue
+                }
+            }
+        }
+        
+        // Function to take snapshot
+        function takeSnapshot() {
+            // Create a temporary link element
+            const link = document.createElement('a');
+            link.download = 'webcam-snapshot-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        // Function to update brightness level
+        function updateBrightnessLevel() {
+            brightnessLevel = parseInt(brightnessSlider.value);
+            brightnessValue.textContent = brightnessLevel;
+        }
+        
+        // Function to update pixelate level
+        function updatePixelateLevel() {
+            pixelateLevel = parseInt(pixelateSlider.value);
+            pixelateValue.textContent = pixelateLevel;
+        }
+    </script>
+</body>
+</html>

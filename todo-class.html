@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/styles/index.css" />
+    <title>Week 1 Basic HTML Practice</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        position: relative;
+        height: 300px;
+      }
+      .inner-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+    </style>
+  </head>
+  <body>
+    <div class="inner-box">
+      <h1>My todo list</h1>
+      <form>
+        <label for="todo"
+          >Enter your todo-item
+          <input type="text" id="todo" name="todo-item" />
+        </label>
+        <button type="button">Submit</button>
+      </form>
+      <ul>
+        <li>This a sample todo item</li>
+      </ul>
+    </div>
+  </body>
+</html>
+
+<!-- Lessons -->
+
+<!-- Atributes are very important -->
+<!-- Attributes allow for some native styling  -->
+<!-- Attributes will link us to javascript functionality -->
+<!-- elements: <a> <form> <input> -->
+<!-- Relative and Absolute paths -->
+<!-- Starting to look at <Style> -->
+<!-- Centering content -->
